@@ -1,0 +1,1259 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>THAI Cargo Inventory System</title>
+    <link
+      rel="icon"
+      href="https://www.thaicargo.com/public/resources/images/apple-icon-76x76.png"
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+      :root {
+        --thai-purple: #3d1a6e;
+        --thai-yellow: #ffca08;
+        --thai-pink: #c7158d;
+      }
+      .main-header {
+        background-color: var(--thai-purple);
+        width: 100%;
+        padding: 1rem 2rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 1000;
+        transition: transform 0.1s ease-in-out !important;
+        box-sizing: border-box;
+      }
+      .header-hidden {
+        transform: translateY(-100%);
+        box-shadow: none !important;
+      }
+
+      .header-logo {
+        height: 60px !important;
+        width: auto !important;
+        display: block;
+        object-fit: contain;
+        image-rendering: -webkit-optimize-contrast;
+      }
+      .content-wrapper {
+        padding-top: 100px;
+      }
+      body {
+        font-family: "Helvetica Neue", sans-serif;
+        background-color: #f5f5f5;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      .card {
+        background: white;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        margin-bottom: 10px;
+        width: 100%;
+        box-sizing: border-box;
+      }
+      .tab-content {
+        display: none;
+      }
+      .active {
+        display: block;
+      }
+      th {
+        background-color: #f3f0f7;
+        white-space: nowrap;
+        padding: 12px 8px;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        color: var(--thai-purple);
+        border: 1px solid #e5e7eb;
+      }
+      td {
+        padding: 10px 8px;
+        border: 1px solid #e5e7eb;
+        vertical-align: middle;
+      }
+      .nowrap {
+        white-space: nowrap;
+      }
+      .product-name-cell {
+        max-width: 250px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 600;
+      }
+      .edit-mode {
+        background-color: #fffdf2;
+        border: 2px solid var(--thai-yellow) !important;
+      }
+      label {
+        display: block;
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 0.25rem;
+        white-space: nowrap;
+      }
+      .tab-desc {
+        color: #6b7280;
+        font-size: 0.95rem;
+        margin-bottom: 1.5rem;
+      }
+      .search-box-standard {
+        width: 15rem;
+      }
+      .sticky-form {
+        position: sticky;
+        top: 1.5rem;
+        z-index: 50;
+        max-height: 85vh;
+        overflow-y: auto;
+        background: white;
+        border-top: 6px solid var(--thai-purple);
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2),
+          0 10px 10px -5px rgba(0, 0, 0, 0.1);
+        transform: translateY(-5px);
+        transition: transform 0.2s ease-out;
+      }
+      .nav-btn-active {
+        background-color: var(--thai-purple);
+        color: white;
+      }
+      .nav-btn-inactive {
+        background-color: #e5e7eb;
+        color: #4b5563;
+      }
+      .nav-btn-inactive:hover {
+        background-color: #d1d5db;
+      }
+      #salesSummaryContent {
+        transform-origin: top;
+      }
+      .sales-analytics-card {
+        min-height: 500px;
+        padding-bottom: 40px;
+      }
+      .chart-container {
+        height: 200px;
+      }
+    </style>
+  </head>
+  <body class="bg-gray-100 p-0 m-0">
+    <header id="mainHeader" class="main-header">
+      <div class="flex items-center gap-4">
+        <img src="main_site_logo.gif" alt="ULD-icon" class="header-logo" />
+        <h1 class="text-4xl px-2 font-bold" style="color: var(--thai-yellow)">
+          INVENTORY SYSTEM
+        </h1>
+      </div>
+      <div class="flex flex-col items-center gap-1 md:flex-row md:gap-">
+        <input
+          type="file"
+          id="importExcel"
+          accept=".xlsx, .xls"
+          class="hidden"
+        />
+        <button
+          onclick="document.getElementById('importExcel').click()"
+          class="bg-gray-200 text-gray-700 w-9 h-9 md:w-auto md:h-auto md:px-4 md:py-2 rounded-lg text-sm font-semibold hover:bg-gray-300 transition flex items-center justify-center"
+          title="Import Excel"
+        >
+          <span>📥</span><span class="hidden md:inline ml-2">Import Excel</span>
+        </button>
+        <button
+          onclick="exportToExcel()"
+          class="text-white w-9 h-9 md:w-auto md:h-auto md:px-4 md:py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition flex items-center justify-center"
+          style="background-color: var(--thai-pink)"
+          title="Export Excel"
+        >
+          <span>📤</span><span class="hidden md:inline ml-2">Export Excel</span>
+        </button>
+      </div>
+    </header>
+
+    <div class="max-w-7xl mx-auto px-4 pb-8 mt-36">
+      <nav class="flex space-x-2 mb-6 border-b border-gray-200 pb-4">
+        <button
+          id="nav-catalog"
+          onclick="showPage('catalog')"
+          class="nav-btn px-4 py-2 rounded-lg nav-btn-active"
+        >
+          Product Catalog
+        </button>
+        <button
+          id="nav-sales"
+          onclick="showPage('sales')"
+          class="nav-btn px-4 py-2 rounded-lg nav-btn-inactive"
+        >
+          Sales Record
+        </button>
+        <button
+          id="nav-reports"
+          onclick="showPage('reports')"
+          class="nav-btn px-4 py-2 rounded-lg nav-btn-inactive"
+        >
+          Sales Report
+        </button>
+      </nav>
+
+      <div id="catalog" class="tab-content active">
+        <div class="flex justify-between items-start mb-6">
+          <div class="flex items-center gap-4">
+            <img
+              src="ULD-Thai-Cargo.png"
+              alt="Logo"
+              class="h-16 w-auto object-contain"
+            />
+
+            <div class="flex flex-col">
+              <h2 class="text-3xl font-bold" style="color: var(--thai-purple)">
+                Product Catalog
+              </h2>
+              <p class="text-gray-500 text-sm italic mt-1">
+                Manage all product inventory with unified specifications.
+              </p>
+            </div>
+          </div>
+          <button
+            onclick="toggleForm()"
+            class="text-white px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition"
+            style="background-color: var(--thai-pink)"
+          >
+            Toggle Add/Edit Form
+          </button>
+        </div>
+
+        <div id="formContainer" class="card sticky-form" style="display: none">
+          <div class="flex justify-between items-center mb-4">
+            <h3
+              id="formTitle"
+              class="text-lg font-semibold"
+              style="color: var(--thai-purple)"
+            >
+              ➕ Add New Product
+            </h3>
+            <button
+              onclick="toggleForm()"
+              class="text-gray-400 hover:text-gray-600"
+            >
+              ✕
+            </button>
+          </div>
+          <input type="hidden" id="editIndex" value="-1" />
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+            <div>
+              <label>Product ID</label
+              ><input
+                id="pID"
+                type="text"
+                class="border p-2 w-full rounded font-mono text-sm focus:ring-2 focus:ring-purple-200 outline-none"
+              />
+            </div>
+            <div class="md:col-span-2">
+              <label>Product Name</label
+              ><input
+                id="pName"
+                type="text"
+                class="border p-2 w-full rounded text-sm focus:ring-2 focus:ring-purple-200 outline-none"
+              />
+            </div>
+            <div>
+              <label>Specification</label
+              ><input
+                id="pSpec"
+                type="text"
+                class="border p-2 w-full rounded text-sm focus:ring-2 focus:ring-purple-200 outline-none"
+                placeholder="e.g. XL/Red"
+              />
+            </div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+            <div>
+              <label>Initial Stock</label
+              ><input
+                id="pInitialStock"
+                type="number"
+                class="border p-2 w-full rounded text-sm focus:ring-2 focus:ring-purple-200 outline-none"
+              />
+            </div>
+            <div>
+              <label>Stock</label
+              ><input
+                id="pStock"
+                type="number"
+                class="border p-2 w-full rounded text-sm focus:ring-2 focus:ring-purple-200 outline-none"
+              />
+            </div>
+            <div>
+              <label>Gifts&More Price</label
+              ><input
+                id="pGPrice"
+                type="number"
+                step="0.01"
+                class="border p-2 w-full rounded text-sm focus:ring-2 focus:ring-purple-200 outline-none"
+              />
+            </div>
+            <div>
+              <label>Requisition Price</label
+              ><input
+                id="pRPrice"
+                type="number"
+                step="0.01"
+                class="border p-2 w-full rounded text-sm focus:ring-2 focus:ring-purple-200 outline-none"
+              />
+            </div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label>Stock Date</label
+              ><input
+                id="pDate"
+                type="date"
+                class="border p-2 w-full rounded text-sm focus:ring-2 focus:ring-purple-200 outline-none"
+              />
+            </div>
+            <div>
+              <label>Status</label>
+              <select
+                id="pStatus"
+                class="border p-2 w-full rounded text-sm focus:ring-2 focus:ring-purple-200 outline-none"
+              >
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+              </select>
+            </div>
+            <div class="md:col-span-2">
+              <label>Remark</label
+              ><input
+                id="pRemark"
+                type="text"
+                class="border p-2 w-full rounded text-sm focus:ring-2 focus:ring-purple-200 outline-none"
+                placeholder="Additional notes..."
+              />
+            </div>
+          </div>
+          <div class="mt-4 flex gap-2">
+            <button
+              onclick="handleSave()"
+              class="text-white px-6 py-2 rounded-lg font-semibold hover:opacity-90 transition"
+              style="background-color: var(--thai-purple)"
+            >
+              Save Product
+            </button>
+            <button
+              id="formDeleteBtn"
+              onclick="handleFormDelete()"
+              class="hidden bg-red-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-red-700 transition"
+            >
+              Delete Product
+            </button>
+            <button
+              id="cancelBtn"
+              onclick="resetForm()"
+              class="hidden bg-gray-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-gray-600 transition"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+
+        <div class="card overflow-x-auto shadow-sm">
+          <div class="flex items-center justify-between mb-4 gap-4">
+            <div class="flex items-center gap-3">
+              <img
+                src="347-3475012_inventory-png-photos-inventory-icon-free.png"
+                alt="Logo"
+                class="h-10 w-auto object-contain"
+              />
+              <h3 class="text-2xl font-bold" style="color: var(--thai-purple)">
+                Inventory
+              </h3>
+            </div>
+
+            <input
+              type="text"
+              id="catalogSearch"
+              onkeyup="renderAll()"
+              placeholder="🔍 Search ID or Name..."
+              class="border p-2 rounded-lg text-sm w-64 focus:ring-2 focus:ring-yellow-400 outline-none"
+            />
+          </div>
+          <table class="w-full text-left border-collapse text-xs md:text-sm">
+            <thead>
+              <tr>
+                <th>Product ID</th>
+                <th>Product Name</th>
+                <th>Specification</th>
+                <th>Initial Stock</th>
+                <th>Stock</th>
+                <th>Gifts&More Price</th>
+                <th>Requisition Price</th>
+                <th>Stock Date</th>
+                <th>Status</th>
+                <th>Remark</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="productTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="sales" class="tab-content">
+        <h2 class="text-2xl font-bold mb-1">🧾 Sales Record</h2>
+        <p class="tab-desc">
+          Record product sales by selecting items and entering transaction
+          details.
+        </p>
+        <div class="card">
+          <h3
+            class="text-lg font-semibold mb-4"
+            style="color: var(--thai-purple)"
+          >
+            📈 Record New Sale
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label>Sale Date</label
+              ><input
+                id="saleDateCustom"
+                type="date"
+                class="border p-2 w-full rounded focus:ring-2 focus:ring-purple-500 outline-none"
+              />
+            </div>
+            <div>
+              <label>Sale Type</label>
+              <select
+                id="saleType"
+                class="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500 outline-none"
+              >
+                <option value="Gifts&More">Gifts&More Shop</option>
+                <option value="Requisition">Requisition</option>
+              </select>
+            </div>
+
+            <div class="relative">
+              <label>Select Product</label>
+              <input
+                id="saleSearchInput"
+                type="text"
+                placeholder="Type to search..."
+                class="w-full border p-2 rounded outline-none focus:ring-2 focus:ring-purple-500"
+                oninput="filterSaleProducts()"
+                onfocus="showSaleDropdown()"
+              />
+              <input type="hidden" id="saleSelect" value="" />
+              <div
+                id="saleDropdownOptions"
+                class="absolute z-10 w-full bg-white border rounded-b-lg shadow-lg mt-1 max-h-60 overflow-y-auto hidden"
+              ></div>
+            </div>
+            <div>
+              <label>Quantity</label
+              ><input
+                id="saleQty"
+                type="number"
+                value="1"
+                min="1"
+                class="border p-2 w-full rounded focus:ring-2 focus:ring-purple-500 outline-none"
+              />
+            </div>
+
+            <div class="md:col-span-2">
+              <label>Requestor</label
+              ><input
+                id="saleReq"
+                type="text"
+                placeholder="Staff Name"
+                class="border p-2 w-full rounded focus:ring-2 focus:ring-purple-500 outline-none"
+              />
+            </div>
+          </div>
+          <div class="mt-4 flex gap-2">
+            <button
+              onclick="recordSale()"
+              class="text-white px-6 py-2 rounded-lg font-semibold hover:opacity-90 transition"
+              style="background-color: var(--thai-purple)"
+            >
+              Submit Sale
+            </button>
+            <button
+              onclick="clearSaleForm()"
+              class="bg-gray-400 text-white px-6 py-2 rounded-lg font-semibold hover:bg-gray-500"
+            >
+              Clear Form
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="reports" class="tab-content">
+        <h2 class="text-2xl font-bold mb-1">📊 Sales Report</h2>
+        <p class="tab-desc">
+          Comprehensive view of sales performance and monthly totals.
+        </p>
+        <div class="card shadow-sm">
+          <div class="flex justify-between items-center mb-4">
+            <div
+              class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+              onclick="toggleSummary()"
+            >
+              <h3
+                class="text-lg font-semibold"
+                style="color: var(--thai-purple)"
+              >
+                📅 Sales Log
+              </h3>
+              <svg
+                id="summaryToggleIcon"
+                xmlns="http://www.w3.org/2000/svg"
+                class="h-5 w-5 text-gray-500 transition-transform duration-300"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M19 9l-7 7-7-7"
+                />
+              </svg>
+            </div>
+            <div class="flex items-center gap-2">
+              <button
+                onclick="document.getElementById('reportMonthPicker').value=''; currentMonthFilter=''; renderAll();"
+                class="text-xs px-2 py-3 rounded bg-gray-200 hover:bg-gray-300"
+              >
+                Clear
+              </button>
+              <input
+                type="month"
+                id="reportMonthPicker"
+                class="border p-2 rounded-lg text-sm shadow-sm bg-white focus:ring-2 focus:ring-yellow-400 outline-none"
+                onchange="applyMonthPicker()"
+              />
+              <input
+                id="reportSearchInput"
+                type="text"
+                placeholder="🔍 Search ID or Name..."
+                class="search-box-standard border p-2 rounded-lg text-sm shadow-sm focus:ring-2 focus:ring-yellow-400 outline-none"
+                oninput="renderAll()"
+              />
+            </div>
+          </div>
+          <div
+            id="salesSummaryContent"
+            class="overflow-x-auto transition-all duration-300 ease-in-out block"
+          >
+            <table class="w-full text-left border-collapse text-xs md:text-sm">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Product ID</th>
+                  <th>Product Name</th>
+                  <th>Specification</th>
+                  <th>Qty Sold</th>
+                  <th>Sale Type</th>
+                  <th>Unit Price</th>
+                  <th>Revenue</th>
+                  <th>Requestor</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="salesTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card shadow-sm">
+          <h3
+            class="text-lg font-semibold mb-4"
+            style="color: var(--thai-purple)"
+          >
+            📆 Monthly Totals
+          </h3>
+          <table class="w-full text-left border-collapse text-xs md:text-sm">
+            <thead>
+              <tr>
+                <th>Month</th>
+                <th>Qty</th>
+                <th>Gifts&More</th>
+                <th>Requisition</th>
+              </tr>
+            </thead>
+            <tbody id="monthlyTableBody"></tbody>
+          </table>
+        </div>
+
+        <div class="card sales-analytics-card shadow-sm mt-6 w-full">
+          <div
+            class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b pb-4"
+          >
+            <div>
+              <h3 class="text-xl font-bold" style="color: var(--thai-purple)">
+                📈 Sales Analytics
+              </h3>
+              <p class="text-xs text-gray-500">
+                Switch between high-level names or granular SKU data
+              </p>
+            </div>
+            <div class="flex items-center gap-2 bg-gray-100 p-1 rounded-lg">
+              <button
+                id="btn-granular"
+                onclick="setChartMode('granular')"
+                class="px-4 py-1.5 text-xs rounded-md bg-white shadow-sm font-bold transition-all"
+                style="color: var(--thai-purple)"
+              >
+                Granular (SKU)
+              </button>
+              <button
+                id="btn-consolidated"
+                onclick="setChartMode('consolidated')"
+                class="px-4 py-1.5 text-xs rounded-md text-gray-500 hover:text-gray-700 transition-all"
+              >
+                Consolidated (Name)
+              </button>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div
+              class="chart-container relative w-full"
+              style="height: 350px; min-width: 5"
+            >
+              <p class="text-sm font-semibold mb-2 text-center text-gray-600">
+                Top 10 Revenue Performance
+              </p>
+              <canvas id="revenueBarChart"></canvas>
+            </div>
+            <div
+              class="chart-container relative w-full"
+              style="height: 350px; min-width: 5"
+            >
+              <p class="text-sm font-semibold mb-2 text-center text-gray-600">
+                Revenue Distribution by Type
+              </p>
+              <canvas id="typeDonutChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="fixed bottom-6 left-6 z-50 flex flex-col gap-3 group">
+      <button
+        onclick="document.getElementById('importExcel').click()"
+        class="flex items-center justify-center w-12 h-12 bg-white text-gray-700 rounded-full shadow-lg border border-gray-200 hover:bg-gray-50 hover:scale-110 transition-all duration-300"
+        title="Import Excel"
+      >
+        📥
+      </button>
+      <button
+        onclick="exportToExcel()"
+        class="flex items-center justify-center w-12 h-12 text-white rounded-full shadow-lg hover:brightness-110 hover:scale-110 transition-all duration-300"
+        style="background-color: var(--thai-pink)"
+        title="Export Excel"
+      >
+        📤
+      </button>
+    </div>
+
+    <button
+      id="scrollToTopBtn"
+      onclick="scrollToTop()"
+      class="fixed bottom-6 right-6 z-50 w-12 h-12 bg-white text-purple-900 rounded-full shadow-lg border border-gray-200 hover:bg-purple-50 hover:scale-110 transition-all duration-300 opacity-0 invisible translate-y-10 flex items-center justify-center"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        class="h-6 w-6"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M5 10l7-7m0 0l7 7m-7-7v18"
+        />
+      </svg>
+    </button>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+      let chartMode = "granular";
+      let revenueChart = null;
+      let donutChart = null;
+      let products = JSON.parse(localStorage.getItem("products")) || [];
+      let sales = JSON.parse(localStorage.getItem("sales")) || [];
+      let currentReportFilter = { type: "all", value: "" };
+      let currentMonthFilter = "";
+
+      function jsDateToExcel(d) {
+        return Math.floor(25569 + d.getTime() / 86400000);
+      }
+      function excelToJSDate(s) {
+        return new Date(Math.floor(s - 25569) * 86400000);
+      }
+      function formatDateDisplay(val) {
+        if (!val) return "-";
+        let date =
+          !isNaN(val) && typeof val === "number"
+            ? excelToJSDate(val)
+            : new Date(val);
+        if (isNaN(date.getTime())) return val;
+        return date
+          .toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          })
+          .toUpperCase();
+      }
+
+      function renderAll() {
+        const catSearch = document
+          .getElementById("catalogSearch")
+          .value.toLowerCase();
+        document.getElementById("productTableBody").innerHTML = products
+          .filter(
+            (p) =>
+              (p["Product Name"] || "").toLowerCase().includes(catSearch) ||
+              (p["Product ID"] || "").toLowerCase().includes(catSearch)
+          )
+          .map(
+            (p) => `
+            <tr>
+              <td>${p["Product ID"]}</td>
+              <td class="product-name-cell">${p["Product Name"]}</td>
+              <td>${p.Specification || "-"}</td>
+              <td class="text-center text-gray-500">${
+                p["Initial Stock"] || 0
+              }</td>
+              <td class="text-center font-bold" style="color: var(--thai-purple);">${
+                p.Stock
+              }</td>
+              <td>฿${(p["Gifts&More Shop Price"] || 0).toLocaleString()}</td>
+              <td>฿${(p["Requisition Price"] || 0).toLocaleString()}</td>
+              <td class="nowrap">${formatDateDisplay(p["Stock Date"])}</td>
+              <td class="${
+                p.Status === "Active"
+                  ? "text-green-600 font-bold"
+                  : "text-red-600 font-bold"
+              }">${p.Status}</td>
+              <td>${p.Remark || "-"}</td>
+              <td><button onclick="startEdit(${products.indexOf(
+                p
+              )})" class="font-bold hover:underline" style="color: var(--thai-pink);">Edit</button></td>
+            </tr>`
+          )
+          .join("");
+
+        const reportSearch = document
+          .getElementById("reportSearchInput")
+          .value.toLowerCase();
+
+        document.getElementById("salesTableBody").innerHTML = sales
+          .filter((s) => {
+            const date = !isNaN(s.Date)
+              ? excelToJSDate(s.Date)
+              : new Date(s.Date);
+
+            const saleMonthYear =
+              date.getFullYear() +
+              "-" +
+              String(date.getMonth() + 1).padStart(2, "0");
+
+            const matchesMonth =
+              !currentMonthFilter || saleMonthYear === currentMonthFilter;
+
+            const matchesText =
+              (s["Product Name"] || "").toLowerCase().includes(reportSearch) ||
+              (s["Product ID"] || "").toLowerCase().includes(reportSearch);
+
+            return matchesMonth && matchesText;
+          })
+          .map(
+            (s, idx) => `
+            <tr class="hover:bg-gray-50">
+              <td class="nowrap">${formatDateDisplay(s.Date)}</td>
+              <td>${s["Product ID"]}</td>
+              <td class="product-name-cell">${s["Product Name"]}</td>
+              <td>${s.Specification || "-"}</td>
+              <td class="text-center">${s["Qty Sold"]}</td>
+              <td>${s["Sale Type"]}</td>
+              <td>฿${(s.Price || 0).toLocaleString()}</td>
+              <td class="font-bold" style="color: var(--thai-purple);">฿${(
+                s.Revenue || 0
+              ).toLocaleString()}</td>
+              <td>${s.Requestor}</td>
+              <td><button onclick="deleteSale(${idx})" class="text-red-600 font-bold hover:underline">Delete</button></td>
+            </tr>`
+          )
+          .join("");
+
+        const monthly = {};
+        sales.forEach((s) => {
+          const date = !isNaN(s.Date)
+            ? excelToJSDate(s.Date)
+            : new Date(s.Date);
+          const month = date
+            .toLocaleDateString("en-GB", { month: "short", year: "numeric" })
+            .toUpperCase();
+          if (!monthly[month]) monthly[month] = { qty: 0, g: 0, r: 0 };
+          monthly[month].qty += Number(s["Qty Sold"]);
+          if (s["Sale Type"] === "Gifts&More")
+            monthly[month].g += Number(s.Revenue);
+          else monthly[month].r += Number(s.Revenue);
+        });
+        document.getElementById("monthlyTableBody").innerHTML = Object.keys(
+          monthly
+        )
+          .map(
+            (m) => `
+            <tr class="hover:bg-gray-50 border-b">
+              <td class="font-bold py-2">${m}</td><td class="text-center py-2">${
+              monthly[m].qty
+            }</td>
+              <td class="py-2 font-semibold" style="color: var(--thai-pink);">฿${monthly[
+                m
+              ].g.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+              <td class="py-2 font-semibold" style="color: var(--thai-purple);">฿${monthly[
+                m
+              ].r.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+            </tr>`
+          )
+          .join("");
+
+        if (
+          document
+            .getElementById("nav-reports")
+            .classList.contains("nav-btn-active")
+        ) {
+          updateCharts();
+        }
+      }
+
+      function deleteSale(idx) {
+        if (
+          !confirm(
+            "Are you sure you want to delete this sale entry? Stock will be restored."
+          )
+        )
+          return;
+
+        const reportSearch = document
+          .getElementById("reportSearchInput")
+          .value.toLowerCase();
+        const filteredSales = sales.filter((s) => {
+          const date = !isNaN(s.Date)
+            ? excelToJSDate(s.Date)
+            : new Date(s.Date);
+          const saleMonthYear =
+            date.getFullYear() +
+            "-" +
+            String(date.getMonth() + 1).padStart(2, "0");
+          const matchesMonth =
+            !currentMonthFilter || saleMonthYear === currentMonthFilter;
+          const matchesText =
+            (s["Product Name"] || "").toLowerCase().includes(reportSearch) ||
+            (s["Product ID"] || "").toLowerCase().includes(reportSearch);
+          return matchesMonth && matchesText;
+        });
+
+        const targetSale = filteredSales[idx];
+        const originalIndex = sales.indexOf(targetSale);
+
+        if (originalIndex > -1) {
+          const product = products.find(
+            (p) => p["Product ID"] === targetSale["Product ID"]
+          );
+          if (product) {
+            product.Stock += targetSale["Qty Sold"];
+          }
+          sales.splice(originalIndex, 1);
+          saveData();
+          renderAll();
+        }
+      }
+
+      function applyMonthPicker() {
+        currentMonthFilter = document.getElementById("reportMonthPicker").value;
+        renderAll();
+      }
+
+      window.addEventListener("scroll", function () {
+        const header = document.getElementById("mainHeader");
+        const scrollBtn = document.getElementById("scrollToTopBtn");
+        const currentScroll = window.scrollY;
+        if (header) {
+          currentScroll > 50
+            ? header.classList.add("header-hidden")
+            : header.classList.remove("header-hidden");
+        }
+        if (scrollBtn) {
+          if (currentScroll > 300) {
+            scrollBtn.classList.remove(
+              "opacity-0",
+              "invisible",
+              "translate-y-10"
+            );
+            scrollBtn.classList.add("opacity-100", "visible", "translate-y-0");
+          } else {
+            scrollBtn.classList.add("opacity-0", "invisible", "translate-y-10");
+            scrollBtn.classList.remove(
+              "opacity-100",
+              "visible",
+              "translate-y-0"
+            );
+          }
+        }
+      });
+
+      function scrollToTop() {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+
+      function updateCharts() {
+        const processedData = {};
+        let totalGifts = 0,
+          totalReq = 0;
+        sales.forEach((s) => {
+          const key =
+            chartMode === "consolidated" ? s["Product Name"] : s["Product ID"];
+          const rev = Number(s.Revenue || 0);
+          if (!processedData[key]) {
+            processedData[key] = {
+              label:
+                chartMode === "consolidated"
+                  ? s["Product Name"]
+                  : `${s["Product Name"]} (${s["Product ID"]})`,
+              revenue: 0,
+              type: s["Sale Type"],
+            };
+          }
+          processedData[key].revenue += rev;
+          if (s["Sale Type"] === "Gifts&More") totalGifts += rev;
+          else totalReq += rev;
+        });
+        const topItems = Object.values(processedData)
+          .sort((a, b) => b.revenue - a.revenue)
+          .slice(0, 10);
+        const barCtx = document.getElementById("revenueBarChart");
+        if (revenueChart) revenueChart.destroy();
+        revenueChart = new Chart(barCtx, {
+          type: "bar",
+          data: {
+            labels: topItems.map((i) => i.label),
+            datasets: [
+              {
+                data: topItems.map((i) => i.revenue),
+                backgroundColor: topItems.map((i) =>
+                  i.type === "Gifts&More" ? "#c7158d" : "#3d1a6e"
+                ),
+                borderRadius: 4,
+              },
+            ],
+          },
+          options: {
+            indexAxis: "y",
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+          },
+        });
+        const donutCtx = document.getElementById("typeDonutChart");
+        if (donutChart) donutChart.destroy();
+        donutChart = new Chart(donutCtx, {
+          type: "doughnut",
+          data: {
+            labels: ["Gifts&More", "Requisition"],
+            datasets: [
+              {
+                data: [totalGifts, totalReq],
+                backgroundColor: ["#c7158d", "#3d1a6e"],
+                borderWidth: 0,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: "70%",
+            plugins: { legend: { position: "bottom" } },
+          },
+        });
+      }
+
+      function toggleSummary() {
+        const content = document.getElementById("salesSummaryContent");
+        const icon = document.getElementById("summaryToggleIcon");
+        if (content.classList.contains("hidden")) {
+          content.classList.remove("hidden");
+          icon.style.transform = "rotate(0deg)";
+        } else {
+          content.classList.add("hidden");
+          icon.style.transform = "rotate(-90deg)";
+        }
+      }
+
+      function setChartMode(mode) {
+        chartMode = mode;
+        const isG = mode === "granular";
+        document.getElementById("btn-granular").className = isG
+          ? "px-4 py-1.5 text-xs rounded-md bg-white shadow-sm font-bold"
+          : "px-4 py-1.5 text-xs rounded-md text-gray-500";
+        document.getElementById("btn-consolidated").className = !isG
+          ? "px-4 py-1.5 text-xs rounded-md bg-white shadow-sm font-bold"
+          : "px-4 py-1.5 text-xs rounded-md text-gray-500";
+        updateCharts();
+      }
+
+      function filterSaleProducts() {
+        const input = document
+          .getElementById("saleSearchInput")
+          .value.toLowerCase();
+        const dropdown = document.getElementById("saleDropdownOptions");
+        const filtered = products.filter(
+          (p) =>
+            (p["Product Name"] || "").toLowerCase().includes(input) ||
+            (p["Product ID"] || "").toLowerCase().includes(input)
+        );
+        dropdown.innerHTML = filtered
+          .map(
+            (p) => `
+          <div onclick="selectSaleProduct('${p["Product ID"]}', '${
+              p["Product Name"]
+            } (${
+              p.Specification || "-"
+            })')" class="p-2 hover:bg-gray-100 cursor-pointer text-sm">
+            <span class="font-bold" style="color: var(--thai-purple);">[${
+              p["Product ID"]
+            }]</span> ${
+              p["Product Name"]
+            } <span class="text-gray-400 italic"> (${
+              p.Specification || "-"
+            })</span>
+            <span class="float-right text-xs font-semibold ${
+              p.Stock > 0 ? "text-green-600" : "text-red-600"
+            }">Stock: ${p.Stock}</span>
+          </div>`
+          )
+          .join("");
+        dropdown.classList.remove("hidden");
+      }
+
+      function handleSave() {
+        const index = parseInt(document.getElementById("editIndex").value);
+        const id = document.getElementById("pID").value.trim();
+        const name = document.getElementById("pName").value.trim();
+        const stockValue = Number(document.getElementById("pStock").value) || 0;
+        const initialValue =
+          Number(document.getElementById("pInitialStock").value) || 0;
+        if (!id || !name) return alert("Required fields missing!");
+
+        const pData = {
+          "Product ID": id,
+          "Product Name": name,
+          Specification: document.getElementById("pSpec").value || "-",
+          Stock: stockValue,
+          "Initial Stock": initialValue,
+          "Gifts&More Shop Price":
+            Number(document.getElementById("pGPrice").value) || 0,
+          "Requisition Price":
+            Number(document.getElementById("pRPrice").value) || 0,
+          "Stock Date": document.getElementById("pDate").value
+            ? jsDateToExcel(new Date(document.getElementById("pDate").value))
+            : jsDateToExcel(new Date()),
+          Status: document.getElementById("pStatus").value,
+          Remark: document.getElementById("pRemark").value || "-",
+        };
+        if (index >= 0) products[index] = pData;
+        else products.push(pData);
+        saveData();
+        resetForm();
+        renderAll();
+        alert("Saved.");
+      }
+
+      function handleFormDelete() {
+        const index = parseInt(document.getElementById("editIndex").value);
+        if (index >= 0) {
+          const pName = products[index]["Product Name"];
+          if (confirm(`Are you sure you want to delete "${pName}"? This cannot be undone.`)) {
+            products.splice(index, 1); // Remove the product from the array
+            saveData();                // Sync with LocalStorage
+            resetForm();               // Clear the form and hide edit mode
+            toggleForm();              // Close the form container
+            renderAll();               // Refresh the table
+            alert("Product deleted.");
+          }
+        }
+      }
+
+      function recordSale() {
+        const pID = document.getElementById("saleSelect").value;
+        const p = products.find((item) => item["Product ID"] === pID);
+        const qty = Number(document.getElementById("saleQty").value);
+        const customDate = document.getElementById("saleDateCustom").value;
+
+        if (p && p.Stock >= qty) {
+          const type = document.getElementById("saleType").value;
+          const price =
+            type === "Gifts&More"
+              ? p["Gifts&More Shop Price"]
+              : p["Requisition Price"];
+          sales.push({
+            Date: customDate
+              ? jsDateToExcel(new Date(customDate))
+              : jsDateToExcel(new Date()),
+            "Product ID": p["Product ID"],
+            "Product Name": p["Product Name"],
+            Specification: p.Specification,
+            "Qty Sold": qty,
+            "Sale Type": type,
+            Price: price,
+            Revenue: Number((price * qty).toFixed(2)),
+            Requestor: document.getElementById("saleReq").value,
+          });
+          p.Stock -= qty;
+          saveData();
+          renderAll();
+          clearSaleForm();
+          alert("Recorded.");
+        } else alert("Shortage or selection error!");
+      }
+
+      function exportToExcel() {
+        const now = new Date();
+        const ts = `${String(now.getDate()).padStart(2, "0")}-${String(
+          now.getMonth() + 1
+        ).padStart(2, "0")}-${now.getFullYear()}_${String(
+          now.getHours()
+        ).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}`;
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(
+          wb,
+          XLSX.utils.json_to_sheet(products),
+          "Inventory"
+        );
+        XLSX.utils.book_append_sheet(
+          wb,
+          XLSX.utils.json_to_sheet(sales),
+          "Sales Log"
+        );
+        XLSX.writeFile(wb, `THAIcargo_Inventory_${ts}.xlsx`);
+      }
+
+      document.getElementById("importExcel").addEventListener("change", (e) => {
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          const wb = XLSX.read(new Uint8Array(evt.target.result), {
+            type: "array",
+          });
+          products = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+          if (wb.SheetNames.length > 1)
+            sales = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[1]]);
+          saveData();
+          renderAll();
+          alert("Sync Complete.");
+        };
+        reader.readAsArrayBuffer(e.target.files[0]);
+      });
+
+      function saveData() {
+        localStorage.setItem("products", JSON.stringify(products));
+        localStorage.setItem("sales", JSON.stringify(sales));
+      }
+      function toggleForm() {
+        const f = document.getElementById("formContainer");
+        f.style.display = f.style.display === "none" ? "block" : "none";
+      }
+      function resetForm() {
+        document.getElementById("editIndex").value = "-1";
+        document
+          .querySelectorAll("#formContainer input")
+          .forEach((i) => (i.value = ""));
+        document.getElementById("formTitle").innerText = "➕ Add New Product";
+        document.getElementById("formContainer").classList.remove("edit-mode");
+        document.getElementById("cancelBtn").classList.add("hidden");
+        document.getElementById("formDeleteBtn").classList.add("hidden");
+      }
+
+      function showPage(p) {
+        document
+          .querySelectorAll(".tab-content")
+          .forEach((el) => el.classList.remove("active"));
+        document.getElementById(p).classList.add("active");
+        document.querySelectorAll(".nav-btn").forEach((b) => {
+          b.classList.remove("nav-btn-active");
+          b.classList.add("nav-btn-inactive");
+        });
+        document
+          .getElementById("nav-" + p)
+          .classList.remove("nav-btn-inactive");
+        document.getElementById("nav-" + p).classList.add("nav-btn-active");
+        renderAll();
+      }
+
+      function startEdit(idx) {
+        toggleForm();
+        const p = products[idx];
+        document.getElementById("editIndex").value = idx;
+        document.getElementById("pID").value = p["Product ID"];
+        document.getElementById("pName").value = p["Product Name"];
+        document.getElementById("pSpec").value = p.Specification;
+        document.getElementById("pInitialStock").value =
+          p["Initial Stock"] || 0;
+        document.getElementById("pStock").value = p.Stock;
+        document.getElementById("pGPrice").value = p["Gifts&More Shop Price"];
+        document.getElementById("pRPrice").value = p["Requisition Price"];
+        document.getElementById("pRemark").value = p.Remark;
+        document.getElementById("formTitle").innerText = "✏️ Edit Product";
+        document.getElementById("formContainer").classList.add("edit-mode");
+        document.getElementById("cancelBtn").classList.remove("hidden");
+        document.getElementById("formDeleteBtn").classList.remove("hidden");
+      }
+
+      function selectSaleProduct(id, name) {
+        document.getElementById("saleSelect").value = id;
+        document.getElementById("saleSearchInput").value = name;
+        document.getElementById("saleDropdownOptions").classList.add("hidden");
+      }
+      function showSaleDropdown() {
+        document
+          .getElementById("saleDropdownOptions")
+          .classList.remove("hidden");
+        filterSaleProducts();
+      }
+      function clearSaleForm() {
+        document.getElementById("saleQty").value = 1;
+        document.getElementById("saleReq").value = "";
+        document.getElementById("saleSelect").value = "";
+        document.getElementById("saleSearchInput").value = "";
+        document.getElementById("saleDateCustom").value = new Date()
+          .toISOString()
+          .slice(0, 10);
+      }
+      const monthPicker = document.getElementById("reportMonthPicker");
+      if (monthPicker) {
+        monthPicker.value = new Date().toISOString().slice(0, 7);
+        currentMonthFilter = monthPicker.value;
+      }
+      document.getElementById("saleDateCustom").value = new Date()
+        .toISOString()
+        .slice(0, 10);
+      renderAll();
+    </script>
+  </body>
+</html>
