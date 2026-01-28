@@ -666,25 +666,25 @@
         📤
       </button>
     </div>
+    
 
     <button
       id="scrollToTopBtn"
       onclick="scrollToTop()"
-      class="fixed bottom-6 right-6 z-50 w-12 h-12 bg-white text-purple-900 rounded-full shadow-lg border border-gray-200 hover:bg-purple-50 hover:scale-110 transition-all duration-300 opacity-0 invisible translate-y-10 flex items-center justify-center"
+      class="fixed bottom-20 right-6 z-50 w-12 h-12 bg-white text-purple-900 rounded-full shadow-lg border border-gray-200 hover:bg-purple-50 hover:scale-110 transition-all duration-300 opacity-0 invisible translate-y-10 flex items-center justify-center"
     >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        class="h-6 w-6"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-      >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M5 10l7-7m0 0l7 7m-7-7v18"
-        />
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+      </svg>
+    </button>
+
+    <button
+      id="scrollToBottomBtn"
+      onclick="scrollToBottom()"
+      class="fixed bottom-6 right-6 z-50 w-12 h-12 bg-white text-purple-900 rounded-full shadow-lg border border-gray-200 hover:bg-purple-50 hover:scale-110 transition-all duration-300 opacity-100 flex items-center justify-center"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
       </svg>
     </button>
 
@@ -894,34 +894,45 @@
 
       window.addEventListener("scroll", function () {
         const header = document.getElementById("mainHeader");
-        const scrollBtn = document.getElementById("scrollToTopBtn");
+        const topBtn = document.getElementById("scrollToTopBtn");
+        const bottomBtn = document.getElementById("scrollToBottomBtn");
         const currentScroll = window.scrollY;
+        const scrollHeight = document.body.scrollHeight;
+        const windowHeight = window.innerHeight;
+
+        // Header Logic
         if (header) {
-          currentScroll > 50
-            ? header.classList.add("header-hidden")
-            : header.classList.remove("header-hidden");
+          if (currentScroll > 50) header.classList.add("header-hidden");
+          else header.classList.remove("header-hidden");
         }
-        if (scrollBtn) {
-          if (currentScroll > 300) {
-            scrollBtn.classList.remove(
-              "opacity-0",
-              "invisible",
-              "translate-y-10"
-            );
-            scrollBtn.classList.add("opacity-100", "visible", "translate-y-0");
+
+        // Top Button Logic (Show when scrolled down)
+        if (topBtn) {
+          if (currentScroll > 200) {
+            topBtn.classList.remove("opacity-0", "invisible", "translate-y-10");
+            topBtn.classList.add("opacity-100", "visible", "translate-y-0");
           } else {
-            scrollBtn.classList.add("opacity-0", "invisible", "translate-y-10");
-            scrollBtn.classList.remove(
-              "opacity-100",
-              "visible",
-              "translate-y-0"
-            );
+            topBtn.classList.add("opacity-0", "invisible", "translate-y-10");
+            topBtn.classList.remove("opacity-100", "visible", "translate-y-0");
+          }
+        }
+
+        // Bottom Button Logic (Hide when reached the bottom)
+        if (bottomBtn) {
+          if (windowHeight + currentScroll >= scrollHeight - 100) {
+            bottomBtn.classList.add("opacity-0", "invisible");
+          } else {
+            bottomBtn.classList.remove("opacity-0", "invisible");
           }
         }
       });
 
       function scrollToTop() {
         window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+
+      function scrollToBottom() {
+        window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
       }
 
       function updateCharts() {
