@@ -529,18 +529,19 @@
                 />
               </svg>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 flex-wrap justify-end">
               <button
-                onclick="document.getElementById('reportMonthPicker').value=''; currentMonthFilter=''; renderAll();"
+                onclick="clearDateFilters()"
                 class="text-xs px-2 py-3 rounded bg-gray-200 hover:bg-gray-300"
               >
                 Clear
               </button>
               <input
-                type="month"
-                id="reportMonthPicker"
+                type="date"
+                id="reportDayPicker"
                 class="border p-2 rounded-lg text-sm shadow-sm bg-white focus:ring-2 focus:ring-yellow-400 outline-none"
-                onchange="applyMonthPicker()"
+                onchange="applyDayPicker()"
+                title="Filter by Day"
               />
               <input
                 id="reportSearchInput"
@@ -558,7 +559,7 @@
             <table class="w-full text-left border-collapse text-xs md:text-sm">
               <thead>
                 <tr>
-                  <th>Date</th>
+                  <th onclick="toggleDateSort()" style="cursor:pointer;user-select:none;" title="Sort by Date">Date <span id="dateSortIcon">▲</span></th>
                   <th>Product ID</th>
                   <th>Product Name</th>
                   <th>Specification</th>
@@ -698,6 +699,14 @@
       let sales = JSON.parse(localStorage.getItem("sales")) || [];
       let currentReportFilter = { type: "all", value: "" };
       let currentMonthFilter = "";
+      let currentDayFilter = "";
+      let sortDateAsc = true;
+
+      function toggleDateSort() {
+        sortDateAsc = !sortDateAsc;
+        document.getElementById("dateSortIcon").textContent = sortDateAsc ? "▲" : "▼";
+        renderAll();
+      }
 
       function jsDateToExcel(d) {
         return Math.floor(25569 + d.getTime() / 86400000);
@@ -764,16 +773,27 @@
           .value.toLowerCase();
 
         document.getElementById("salesTableBody").innerHTML = sales
+          .slice()
+          .sort((a, b) => {
+            const da = !isNaN(a.Date) ? excelToJSDate(a.Date) : new Date(a.Date);
+            const db = !isNaN(b.Date) ? excelToJSDate(b.Date) : new Date(b.Date);
+            return sortDateAsc ? da - db : db - da;
+          })
           .filter((s) => {
             const date = !isNaN(s.Date)
               ? excelToJSDate(s.Date)
               : new Date(s.Date);
 
-            const saleMonthYear =
+            const saleDay =
               date.getFullYear() +
               "-" +
-              String(date.getMonth() + 1).padStart(2, "0");
+              String(date.getMonth() + 1).padStart(2, "0") +
+              "-" +
+              String(date.getDate()).padStart(2, "0");
 
+            const saleMonthYear = saleDay.slice(0, 7);
+
+            const matchesDay = !currentDayFilter || saleDay === currentDayFilter;
             const matchesMonth =
               !currentMonthFilter || saleMonthYear === currentMonthFilter;
 
@@ -781,7 +801,7 @@
               (s["Product Name"] || "").toLowerCase().includes(reportSearch) ||
               (s["Product ID"] || "").toLowerCase().includes(reportSearch);
 
-            return matchesMonth && matchesText;
+            return matchesDay && matchesMonth && matchesText;
           })
           .map(
             (s, idx) => `
@@ -887,8 +907,29 @@
         }
       }
 
+      function applyDayPicker() {
+        currentDayFilter = document.getElementById("reportDayPicker").value;
+        if (currentDayFilter) {
+          currentMonthFilter = "";
+          document.getElementById("reportMonthPicker").value = "";
+        }
+        renderAll();
+      }
+
       function applyMonthPicker() {
         currentMonthFilter = document.getElementById("reportMonthPicker").value;
+        if (currentMonthFilter) {
+          currentDayFilter = "";
+          document.getElementById("reportDayPicker").value = "";
+        }
+        renderAll();
+      }
+
+      function clearDateFilters() {
+        currentDayFilter = "";
+        currentMonthFilter = "";
+        document.getElementById("reportDayPicker").value = "";
+        document.getElementById("reportMonthPicker").value = "";
         renderAll();
       }
 
