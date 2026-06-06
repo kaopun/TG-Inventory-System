@@ -3,6 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+    <meta http-equiv="X-Frame-Options" content="DENY" />
     <title>THAI Cargo Inventory System</title>
     <link
       rel="icon"
@@ -715,6 +717,17 @@
         renderAll();
       }
 
+      // Security: escape HTML to prevent XSS from stored/imported data
+      function escapeHtml(str) {
+        if (str === null || str === undefined) return "";
+        return String(str)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
       function jsDateToExcel(d) {
         return Math.floor(25569 + d.getTime() / 86400000);
       }
@@ -750,9 +763,9 @@
           .map(
             (p) => `
             <tr>
-              <td>${p["Product ID"]}</td>
-              <td class="product-name-cell">${p["Product Name"]}</td>
-              <td>${p.Specification || "-"}</td>
+              <td>${escapeHtml(p["Product ID"])}</td>
+              <td class="product-name-cell">${escapeHtml(p["Product Name"])}</td>
+              <td>${escapeHtml(p.Specification || "-")}</td>
               <td class="text-center text-gray-500">${
                 p["Initial Stock"] || 0
               }</td>
@@ -766,8 +779,8 @@
                 p.Status === "Active"
                   ? "text-green-600 font-bold"
                   : "text-red-600 font-bold"
-              }">${p.Status}</td>
-              <td>${p.Remark || "-"}</td>
+              }">${escapeHtml(p.Status)}</td>
+              <td>${escapeHtml(p.Remark || "-")}</td>
               <td><button onclick="startEdit(${products.indexOf(
                 p
               )})" class="font-bold hover:underline" style="color: var(--thai-pink);">Edit</button></td>
@@ -814,16 +827,16 @@
             (s, idx) => `
             <tr class="hover:bg-gray-50">
               <td class="nowrap">${formatDateDisplay(s.Date)}</td>
-              <td>${s["Product ID"]}</td>
-              <td class="product-name-cell">${s["Product Name"]}</td>
-              <td>${s.Specification || "-"}</td>
-              <td class="text-center">${s["Qty Sold"]}</td>
-              <td>${s["Sale Type"]}</td>
+              <td>${escapeHtml(s["Product ID"])}</td>
+              <td class="product-name-cell">${escapeHtml(s["Product Name"])}</td>
+              <td>${escapeHtml(s.Specification || "-")}</td>
+              <td class="text-center">${Number(s["Qty Sold"])}</td>
+              <td>${escapeHtml(s["Sale Type"])}</td>
               <td>฿${(s.Price || 0).toLocaleString()}</td>
               <td class="font-bold" style="color: var(--thai-purple);">฿${(
                 s.Revenue || 0
               ).toLocaleString()}</td>
-              <td>${s.Requestor}</td>
+              <td>${escapeHtml(s.Requestor)}</td>
               <td><button onclick="deleteSale(${idx})" class="text-red-600 font-bold hover:underline">Delete</button></td>
             </tr>`
           )
@@ -1096,24 +1109,19 @@
         dropdown.innerHTML = filtered
           .map(
             (p) => `
-          <div onclick="selectSaleProduct('${p["Product ID"]}', '${
-              p["Product Name"]
-            } (${
-              p.Specification || "-"
-            })')" class="p-2 hover:bg-gray-100 cursor-pointer text-sm">
-            <span class="font-bold" style="color: var(--thai-purple);">[${
-              p["Product ID"]
-            }]</span> ${
-              p["Product Name"]
-            } <span class="text-gray-400 italic"> (${
-              p.Specification || "-"
-            })</span>
+          <div data-id="${escapeHtml(p["Product ID"])}" data-label="${escapeHtml(p["Product Name"])} (${escapeHtml(p.Specification || "-")})" class="p-2 hover:bg-gray-100 cursor-pointer text-sm sale-dropdown-item">
+            <span class="font-bold" style="color: var(--thai-purple);">[${escapeHtml(p["Product ID"])}]</span> ${escapeHtml(p["Product Name"])} <span class="text-gray-400 italic"> (${escapeHtml(p.Specification || "-")})</span>
             <span class="float-right text-xs font-semibold ${
               p.Stock > 0 ? "text-green-600" : "text-red-600"
-            }">Stock: ${p.Stock}</span>
+            }">Stock: ${Number(p.Stock)}</span>
           </div>`
           )
           .join("");
+        dropdown.querySelectorAll(".sale-dropdown-item").forEach((el) => {
+          el.addEventListener("click", function () {
+            selectSaleProduct(this.dataset.id, this.dataset.label);
+          });
+        });
         dropdown.classList.remove("hidden");
       }
 
@@ -1125,6 +1133,12 @@
         const initialValue =
           Number(document.getElementById("pInitialStock").value) || 0;
         if (!id || !name) return alert("Required fields missing!");
+        if (id.length > 50) return alert("Product ID is too long (max 50 chars).");
+        if (name.length > 100) return alert("Product Name is too long (max 100 chars).");
+        if (stockValue < 0 || initialValue < 0) return alert("Stock values cannot be negative.");
+        const gPrice = Number(document.getElementById("pGPrice").value) || 0;
+        const rPrice = Number(document.getElementById("pRPrice").value) || 0;
+        if (gPrice < 0 || rPrice < 0) return alert("Prices cannot be negative.");
 
         const pData = {
           "Product ID": id,
@@ -1168,8 +1182,13 @@
       function recordSale() {
         const pID = document.getElementById("saleSelect").value;
         const p = products.find((item) => item["Product ID"] === pID);
-        const qty = Number(document.getElementById("saleQty").value);
+        const qty = parseInt(document.getElementById("saleQty").value, 10);
         const customDate = document.getElementById("saleDateCustom").value;
+        const requestor = document.getElementById("saleReq").value.trim();
+
+        if (!pID) return alert("Please select a product.");
+        if (!qty || qty <= 0 || qty > 99999) return alert("Quantity must be a positive number.");
+        if (!requestor) return alert("Requestor name is required.");
 
         if (p && p.Stock >= qty) {
           const type = document.getElementById("saleType").value;
@@ -1188,7 +1207,7 @@
             "Sale Type": type,
             Price: price,
             Revenue: Number((price * qty).toFixed(2)),
-            Requestor: document.getElementById("saleReq").value,
+            Requestor: requestor,
           });
           p.Stock -= qty;
           saveData();
