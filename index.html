@@ -586,7 +586,7 @@
           <table class="w-full text-left border-collapse text-xs md:text-sm">
             <thead>
               <tr>
-                <th>Month</th>
+                <th onclick="toggleMonthSort()" style="cursor:pointer;user-select:none;" title="Sort by Month">Month <span id="monthSortIcon">▲</span></th>
                 <th>Qty</th>
                 <th>Gifts&More</th>
                 <th>Requisition</th>
@@ -701,10 +701,17 @@
       let currentMonthFilter = "";
       let currentDayFilter = "";
       let sortDateAsc = true;
+      let sortMonthAsc = true;
 
       function toggleDateSort() {
         sortDateAsc = !sortDateAsc;
         document.getElementById("dateSortIcon").textContent = sortDateAsc ? "▲" : "▼";
+        renderAll();
+      }
+
+      function toggleMonthSort() {
+        sortMonthAsc = !sortMonthAsc;
+        document.getElementById("monthSortIcon").textContent = sortMonthAsc ? "▲" : "▼";
         renderAll();
       }
 
@@ -839,6 +846,11 @@
         document.getElementById("monthlyTableBody").innerHTML = Object.keys(
           monthly
         )
+          .sort((a, b) => {
+            const da = new Date("01 " + a);
+            const db = new Date("01 " + b);
+            return sortMonthAsc ? da - db : db - da;
+          })
           .map(
             (m) => `
             <tr class="hover:bg-gray-50 border-b">
