@@ -531,19 +531,19 @@
                 />
               </svg>
             </div>
-            <div class="flex items-center gap-2 flex-wrap justify-end">
-              <button
-                onclick="clearDateFilters()"
-                class="text-xs px-2 py-3 rounded bg-gray-200 hover:bg-gray-300"
+            <div class="flex items-center gap-2">
+              <button 
+                onclick="clearDateFilters()" 
+                class="bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm font-semibold hover:bg-gray-300 transition shadow-sm"
               >
                 Clear
               </button>
               <input
-                type="date"
-                id="reportDayPicker"
+                type="month"
+                id="reportMonthPicker"
                 class="border p-2 rounded-lg text-sm shadow-sm bg-white focus:ring-2 focus:ring-yellow-400 outline-none"
-                onchange="applyDayPicker()"
-                title="Filter by Day"
+                onchange="applyMonthPicker()"
+                title="Filter by Month"
               />
               <input
                 id="reportSearchInput"
@@ -792,39 +792,40 @@
           .getElementById("reportSearchInput")
           .value.toLowerCase();
 
-        document.getElementById("salesTableBody").innerHTML = sales
-          .slice()
-          .sort((a, b) => {
-            const da = !isNaN(a.Date) ? excelToJSDate(a.Date) : new Date(a.Date);
-            const db = !isNaN(b.Date) ? excelToJSDate(b.Date) : new Date(b.Date);
-            return sortDateAsc ? da - db : db - da;
-          })
-          .filter((s) => {
-            const date = !isNaN(s.Date)
-              ? excelToJSDate(s.Date)
-              : new Date(s.Date);
+        // 1. Create a version of the data that tracks each item's true index in the master sales array
+        const salesWithMasterIndex = sales.map((item, originalIndex) => ({
+          ...item,
+          masterIndex: originalIndex
+        }));
 
-            const saleDay =
-              date.getFullYear() +
-              "-" +
-              String(date.getMonth() + 1).padStart(2, "0") +
-              "-" +
-              String(date.getDate()).padStart(2, "0");
+        // 2. Filter using our tracked master positions
+        const filteredSales = salesWithMasterIndex.filter((s) => {
+          const date = !isNaN(s.Date) ? excelToJSDate(s.Date) : new Date(s.Date);
+          if (isNaN(date.getTime())) return false;
 
-            const saleMonthYear = saleDay.slice(0, 7);
+          const yyyy = date.getFullYear();
+          const mm = String(date.getMonth() + 1).padStart(2, "0");
+          const saleMonthYear = `${yyyy}-${mm}`;
 
-            const matchesDay = !currentDayFilter || saleDay === currentDayFilter;
-            const matchesMonth =
-              !currentMonthFilter || saleMonthYear === currentMonthFilter;
+          const matchesMonth = !currentMonthFilter || saleMonthYear === currentMonthFilter;
+          const matchesText =
+            (s["Product Name"] || "").toLowerCase().includes(reportSearch) ||
+            (s["Product ID"] || "").toLowerCase().includes(reportSearch);
 
-            const matchesText =
-              (s["Product Name"] || "").toLowerCase().includes(reportSearch) ||
-              (s["Product ID"] || "").toLowerCase().includes(reportSearch);
+          return matchesMonth && matchesText;
+        });
 
-            return matchesDay && matchesMonth && matchesText;
-          })
+        // 3. Sort stable records
+        filteredSales.sort((a, b) => {
+          const da = !isNaN(a.Date) ? excelToJSDate(a.Date) : new Date(a.Date);
+          const db = !isNaN(b.Date) ? excelToJSDate(b.Date) : new Date(b.Date);
+          return sortDateAsc ? da - db : db - da;
+        });
+
+        // 4. Render logs with their persistent masterIndex reference 
+        document.getElementById("salesTableBody").innerHTML = filteredSales
           .map(
-            (s, idx) => `
+            (s) => `
             <tr class="hover:bg-gray-50">
               <td class="nowrap">${formatDateDisplay(s.Date)}</td>
               <td>${escapeHtml(s["Product ID"])}</td>
@@ -837,16 +838,16 @@
                 s.Revenue || 0
               ).toLocaleString()}</td>
               <td>${escapeHtml(s.Requestor)}</td>
-              <td><button onclick="deleteSale(${idx})" class="text-red-600 font-bold hover:underline">Delete</button></td>
+              <td><button onclick="deleteSale(${s.masterIndex})" class="text-red-600 font-bold hover:underline">Delete</button></td>
             </tr>`
           )
           .join("");
 
+        // 5. Build dynamic breakdown aggregates
         const monthly = {};
-        sales.forEach((s) => {
-          const date = !isNaN(s.Date)
-            ? excelToJSDate(s.Date)
-            : new Date(s.Date);
+        filteredSales.forEach((s) => {
+          const date = !isNaN(s.Date) ? excelToJSDate(s.Date) : new Date(s.Date);
+          if (isNaN(date.getTime())) return;
           const month = date
             .toLocaleDateString("en-GB", { month: "short", year: "numeric" })
             .toUpperCase();
@@ -856,6 +857,7 @@
             monthly[month].g += Number(s.Revenue);
           else monthly[month].r += Number(s.Revenue);
         });
+
         document.getElementById("monthlyTableBody").innerHTML = Object.keys(
           monthly
         )
@@ -885,76 +887,67 @@
             .getElementById("nav-reports")
             .classList.contains("nav-btn-active")
         ) {
-          updateCharts();
+          updateCharts(filteredSales);
         }
       }
 
-      function deleteSale(idx) {
+      // DELETE THE DUPLICATE BLOCK AND REPLACE WITH THIS SINGLE FUNCTION:
+      function deleteSale(masterIndex) {
+        if (masterIndex === undefined || masterIndex < 0 || masterIndex >= sales.length) return;
+        
+        const targetSale = sales[masterIndex];
         if (
           !confirm(
-            "Are you sure you want to delete this sale entry? Stock will be restored."
+            `Are you sure you want to delete this record?\n[${targetSale["Product ID"]}] ${targetSale["Product Name"]} (${targetSale["Qty Sold"]} items)\nStock will be restored.`
           )
         )
           return;
 
-        const reportSearch = document
-          .getElementById("reportSearchInput")
-          .value.toLowerCase();
-        const filteredSales = sales.filter((s) => {
-          const date = !isNaN(s.Date)
-            ? excelToJSDate(s.Date)
-            : new Date(s.Date);
-          const saleMonthYear =
-            date.getFullYear() +
-            "-" +
-            String(date.getMonth() + 1).padStart(2, "0");
-          const matchesMonth =
-            !currentMonthFilter || saleMonthYear === currentMonthFilter;
-          const matchesText =
-            (s["Product Name"] || "").toLowerCase().includes(reportSearch) ||
-            (s["Product ID"] || "").toLowerCase().includes(reportSearch);
-          return matchesMonth && matchesText;
-        });
-
-        const targetSale = filteredSales[idx];
-        const originalIndex = sales.indexOf(targetSale);
-
-        if (originalIndex > -1) {
-          const product = products.find(
-            (p) => p["Product ID"] === targetSale["Product ID"]
-          );
-          if (product) {
-            product.Stock += targetSale["Qty Sold"];
-          }
-          sales.splice(originalIndex, 1);
-          saveData();
-          renderAll();
+        // Restore target catalog stock counts
+        const product = products.find(
+          (p) => p["Product ID"] === targetSale["Product ID"]
+        );
+        if (product) {
+          product.Stock += Number(targetSale["Qty Sold"]);
         }
+
+        // Remove from true array storage position safely
+        sales.splice(masterIndex, 1);
+        saveData();
+        renderAll();
       }
 
       function applyDayPicker() {
         currentDayFilter = document.getElementById("reportDayPicker").value;
         if (currentDayFilter) {
           currentMonthFilter = "";
-          document.getElementById("reportMonthPicker").value = "";
+          const monthPicker = document.getElementById("reportMonthPicker");
+          if (monthPicker) {
+            monthPicker.value = "";
+          }
         }
         renderAll();
       }
 
       function applyMonthPicker() {
-        currentMonthFilter = document.getElementById("reportMonthPicker").value;
-        if (currentMonthFilter) {
-          currentDayFilter = "";
-          document.getElementById("reportDayPicker").value = "";
+        const picker = document.getElementById("reportMonthPicker");
+        if (picker) {
+          currentMonthFilter = picker.value; // Captures standard "YYYY-MM"
         }
+        currentDayFilter = ""; // Keeps day parameters clear
         renderAll();
       }
 
       function clearDateFilters() {
         currentDayFilter = "";
         currentMonthFilter = "";
-        document.getElementById("reportDayPicker").value = "";
-        document.getElementById("reportMonthPicker").value = "";
+        
+        // Physically reset the HTML input view value on screen
+        const picker = document.getElementById("reportMonthPicker");
+        if (picker) {
+          picker.value = "";
+        }
+        
         renderAll();
       }
 
@@ -1001,11 +994,15 @@
         window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
       }
 
-      function updateCharts() {
+      function updateCharts(filteredSalesData) {
+        // Fall back to all sales records if no filter payload is explicitly passed
+        const dataToUse = filteredSalesData || sales;
+        
         const processedData = {};
         let totalGifts = 0,
           totalReq = 0;
-        sales.forEach((s) => {
+          
+        dataToUse.forEach((s) => {
           const key =
             chartMode === "consolidated" ? s["Product Name"] : s["Product ID"];
           const rev = Number(s.Revenue || 0);
@@ -1023,9 +1020,11 @@
           if (s["Sale Type"] === "Gifts&More") totalGifts += rev;
           else totalReq += rev;
         });
+        
         const topItems = Object.values(processedData)
           .sort((a, b) => b.revenue - a.revenue)
           .slice(0, 10);
+          
         const barCtx = document.getElementById("revenueBarChart");
         if (revenueChart) revenueChart.destroy();
         revenueChart = new Chart(barCtx, {
@@ -1049,6 +1048,7 @@
             plugins: { legend: { display: false } },
           },
         });
+        
         const donutCtx = document.getElementById("typeDonutChart");
         if (donutChart) donutChart.destroy();
         donutChart = new Chart(donutCtx, {
